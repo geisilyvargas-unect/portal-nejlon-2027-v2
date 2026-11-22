@@ -2,7 +2,7 @@
 (function(){
 'use strict';
 const esc2=x=>esc(String(x??''));
-const voteOptions=['Aprova','Aprova com sugestões','Aprova com ressalvas','Reprova','Abstenho'];
+const voteOptions=['Aprovo','Aprovo com sugestões','Aprovo com ressalvas','Reprovo','Abstenho'];
 VOTES.splice(0,VOTES.length,...voteOptions);
 const isAdmin=()=>login?.role==='prescon';
 const draft=()=>{const x=d();return isAdmin()&&!x.published&&!x.closed};
@@ -106,14 +106,14 @@ window.l2VoteChanged=function(i){
  const suggestion=document.getElementById('l2suggestionswrap'+i),caveat=document.getElementById('l2caveatswrap'+i);
  const why=document.querySelector('[name="l2reason'+i+'"]');
  const sw=suggestion?.querySelector('textarea'),cw=caveat?.querySelector('textarea');
- if(suggestion)suggestion.hidden=selected!=='Aprova com sugestões';
- if(caveat)caveat.hidden=selected!=='Aprova com ressalvas';
- if(sw){sw.required=selected==='Aprova com sugestões';if(!sw.required)sw.value='';}
- if(cw){cw.required=selected==='Aprova com ressalvas';if(!cw.required)cw.value='';}
- if(why)why.required=selected==='Reprova';
- const label=document.getElementById('l2whylabel'+i);if(label)label.textContent=selected==='Reprova'?'*':'(opcional)';
+ if(suggestion)suggestion.hidden=selected!=='Aprovo com sugestões';
+ if(caveat)caveat.hidden=selected!=='Aprovo com ressalvas';
+ if(sw){sw.required=selected==='Aprovo com sugestões';if(!sw.required)sw.value='';}
+ if(cw){cw.required=selected==='Aprovo com ressalvas';if(!cw.required)cw.value='';}
+ if(why)why.required=selected==='Reprovo';
+ const label=document.getElementById('l2whylabel'+i);if(label)label.textContent=selected==='Reprovo'?'*':'(opcional)';
  const hint=document.getElementById('l2hint'+i);
- if(hint)hint.textContent=selected==='Aprova com ressalvas'?'A ressalva dependerá da análise da PRESCON para contar como aprovação ou reprovação.':selected==='Aprova com sugestões'?'O voto conta como aprovação; a PRESCON analisará as sugestões.':selected==='Abstenho'?'Você optou por não votar neste cenário.':'';
+ if(hint)hint.textContent=selected==='Aprovo com ressalvas'?'A ressalva dependerá da análise da PRESCON para contar como aprovação ou reprovação.':selected==='Aprovo com sugestões'?'O voto conta como aprovação; a PRESCON analisará as sugestões.':selected==='Abstenho'?'Você optou por não votar neste cenário.':'';
 };
 const previousSubmit=v23Submit;
 v23Submit=function(ev){
@@ -125,12 +125,12 @@ v23Submit=function(ev){
   const vote=String(fd.get('l2scenario'+i)||''),reason=String(fd.get('l2reason'+i)||'').trim();
   const suggestions=String(fd.get('l2suggestions'+i)||'').trim(),caveats=String(fd.get('l2caveats'+i)||'').trim();
   if(!voteOptions.includes(vote))return alert('Vote em todos os cenários.');
-  if(vote==='Reprova'&&!reason)return alert('Justifique a reprovação no cenário '+(i+1)+'.');
-  if(vote==='Aprova com sugestões'&&!suggestions)return alert('Preencha as sugestões do cenário '+(i+1)+'.');
-  if(vote==='Aprova com ressalvas'&&!caveats)return alert('Preencha as condições do cenário '+(i+1)+'.');
+  if(vote==='Reprovo'&&!reason)return alert('Justifique a reprovação no cenário '+(i+1)+'.');
+  if(vote==='Aprovo com sugestões'&&!suggestions)return alert('Preencha as sugestões do cenário '+(i+1)+'.');
+  if(vote==='Aprovo com ressalvas'&&!caveats)return alert('Preencha as condições do cenário '+(i+1)+'.');
   scenarioVotes.push(vote);
-  const body=vote==='Aprova com sugestões'?suggestions:vote==='Aprova com ressalvas'?caveats:vote==='Reprova'?reason:'';
-  if(body)scenarioManif.push({id:'l2m'+Date.now()+'-'+i,q:i,type:vote==='Aprova com sugestões'?'Sugestão':vote==='Aprova com ressalvas'?'Ressalva':'Reprovação',body,status:'pendente',reason:'',justification:reason});
+  const body=vote==='Aprovo com sugestões'?suggestions:vote==='Aprovo com ressalvas'?caveats:vote==='Reprovo'?reason:'';
+  if(body)scenarioManif.push({id:'l2m'+Date.now()+'-'+i,q:i,type:vote==='Aprovo com sugestões'?'Sugestão':vote==='Aprovo com ressalvas'?'Ressalva':'Reprovação',body,status:'pendente',reason:'',justification:reason});
  }
  const before=db.answers.length;
  previousSubmit(ev);
@@ -152,7 +152,7 @@ function l2RefreshProgress(){
   const reason=form.querySelector('[name="l2reason'+i+'"]')?.value.trim();
   const suggestions=form.querySelector('[name="l2suggestions'+i+'"]')?.value.trim();
   const caveats=form.querySelector('[name="l2caveats'+i+'"]')?.value.trim();
-  if(vote&&(!(vote==='Reprova')||reason)&&(!(vote==='Aprova com sugestões')||suggestions)&&(!(vote==='Aprova com ressalvas')||caveats))completed++;
+  if(vote&&(!(vote==='Reprovo')||reason)&&(!(vote==='Aprovo com sugestões')||suggestions)&&(!(vote==='Aprovo com ressalvas')||caveats))completed++;
  }
  const label=document.getElementById('l2ProgressText'),bar=document.getElementById('l2ProgressBar');
  if(label)label.textContent=completed+' / '+sc.length+' cenários concluídos';
