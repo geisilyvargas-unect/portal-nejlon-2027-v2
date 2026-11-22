@@ -36,4 +36,36 @@ function summary(x,anonymous){
 window.l5Publish=function(){if(roles()!=='prescon')return alert('Acesso restrito.');const x=d();if(!x.closed)return alert('Encerre a deliberação antes de publicar o relatório.');x.publicReports??=[];const version=x.publicReports.length+1;const snapshot=summary(x,true);x.publicReports.push({version,html:snapshot,at:new Date().toISOString()});audit('publish-anonymous-report',{id:x.id,version});save();render()};
 const oldReport=report;
 report=function(){const x=d();if(roles()==='prescon')return summary(x,false);const latest=x.publicReports?.at(-1);return latest?latest.html+'<p class="tiny">Versão '+latest.version+' · '+E(latest.at)+'</p>':'<div class="card"><h2>Relatório ainda não publicado</h2><p>A versão anonimizada será disponibilizada após o encerramento e publicação pela PRESCON.</p></div>'};
+
+/* Painel de acompanhamento V2.0 — somente visual, sem simular backend. */
+const previousRenderV20=render;
+render=function(){
+  previousRenderV20();
+  if(login?.role!=='prescon')return;
+  const root=document.getElementById('root');
+  if(!root||document.getElementById('v20-roadmap'))return;
+  const panel=document.createElement('section');
+  panel.id='v20-roadmap';
+  panel.setAttribute('aria-label','Estado da versão 2.0');
+  panel.innerHTML='<div class="v20-eyebrow">PORTAL NEJLON 2027 · EVOLUÇÃO V2.0</div><h2>DO PROTÓTIPO À DELIBERAÇÃO REAL.</h2><p>Esta versão ainda é demonstrativa: os votos e cadastros são armazenados neste navegador. Não utilize para deliberações oficiais.</p><div class="v20-grid"><div><b>01 · ESTRUTURA</b><span>Interface e visualização financeira existentes</span></div><div><b>02 · SEGURANÇA</b><span>Autenticação e banco compartilhado pendentes</span></div><div><b>03 · VOTAÇÃO</b><span>Voto único por EJ em desenvolvimento</span></div><div><b>04 · RESULTADOS</b><span>Auditoria e relatório PDF pendentes</span></div></div><small>Prévia visual de acompanhamento — não representa funcionalidades concluídas.</small>';
+  const main=root.querySelector('.content')||root;
+  main.prepend(panel);
+};
+const roadmapStyle=document.createElement('style');
+roadmapStyle.textContent=`
+:root{--red:#ff0000}
+#v20-roadmap{background:#ff0000;color:#fff;padding:25px 27px;margin:0 0 22px;border:3px solid #111;box-shadow:8px 8px 0 #111;border-radius:0}
+#v20-roadmap .v20-eyebrow{font-size:11px;font-weight:900;letter-spacing:1.7px;color:#111}
+#v20-roadmap h2{font-family:'CY Grotesk V3 Key','Arial Black',sans-serif;font-weight:900;font-size:clamp(25px,3.4vw,45px);line-height:1.04;letter-spacing:-1px;text-transform:uppercase;-webkit-text-stroke:1px #111;text-shadow:3px 3px 0 #111;margin:12px 0}
+#v20-roadmap p{max-width:760px;font-size:13px;line-height:1.6;color:#fff}
+#v20-roadmap .v20-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin:20px 0}
+#v20-roadmap .v20-grid>div{background:#111;color:#fff;padding:14px 16px;display:grid;gap:7px;border:1px solid #fff}
+#v20-roadmap .v20-grid b{color:#ff3b3b;font-size:12px;letter-spacing:.5px}
+#v20-roadmap .v20-grid span{font-size:12px;line-height:1.5}
+#v20-roadmap small{color:#111;font-size:10px;font-weight:800}
+@media(max-width:720px){#v20-roadmap{padding:18px;box-shadow:4px 4px 0 #111}#v20-roadmap .v20-grid{grid-template-columns:1fr}}
+`;
+document.head.appendChild(roadmapStyle);
+
+render();
 })();
