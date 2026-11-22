@@ -9,7 +9,7 @@ const field=(name)=>document.querySelector('[name="'+name+'"]');
 const oldParticipant=v23Participant;
 v23Participant=function(){
  const x=d(),sc=scenarios(x),ej=login?.ej;
- if(!sc.length||login?.role!=='conselho'||!x.published||x.closed||answer(x.id,ej))return oldParticipant();
+ if(login?.role!=='conselho'||!x.published||x.closed||answer(x.id,ej))return oldParticipant();
  const qs=v23Qs(x).filter(q=>q.type!=='vote');
  let html=hero('CONSELHO / DELIBERAÇÃO','SUA VOZ<br>DECIDE.','Formulário completo · planejamento financeiro, cenários e considerações finais.');
  html+='<div class="formlook"><div class="card"><h2>'+E(x.title)+'</h2><p>Falaaaa, conselheiro pé vermelho! ❤️</p><p>'+E(x.desc)+'</p><p><b>EJ:</b> '+E(EJS[ej])+'</p></div>'+v23Rules();
@@ -35,7 +35,7 @@ function refresh(){
 }
 v23Submit=function(ev){
  const form=ev.target,x=d(),sc=scenarios(x);
- if(!sc.length||!form.querySelector('[name="l4vote0"]'))return window.alert('O formulário não está disponível para envio nesta tela.');
+ if(!form.querySelector('[name="l4vote0"]'))return window.alert('O formulário não está disponível para envio nesta tela.');
  ev.preventDefault();
  if(login?.role!=='conselho'||!login.ej||!EJS[login.ej])return alert('Acesso do Conselho inválido.');
  if(!x.published||x.closed||(x.deadline&&Date.now()>new Date(x.deadline).getTime()))return alert('A deliberação não está aberta para respostas.');
@@ -51,7 +51,7 @@ v23Submit=function(ev){
  if(position==='Aprovo com ressalvas'&&!caveats)return alert('Informe as ressalvas.');
  const votes=[position],manif=[],scenarioAnswers=[];
  if(position==='Aprovo com sugestões')manif.push({id:'m'+Date.now()+'-s',q:0,type:'Sugestão',body:suggestions,status:'pendente',reason:''});
- if(position==='Aprovo com ressalvas')caveats.split(/\\r?\\n/).map(v=>v.trim()).filter(Boolean).forEach((body,i)=>manif.push({id:'m'+Date.now()+'-r'+i,q:0,type:'Ressalva',body,status:'pendente',reason:''}));
+ if(position==='Aprovo com ressalvas')caveats.split(/\r?\n/).map(v=>v.trim()).filter(Boolean).forEach((body,i)=>manif.push({id:'m'+Date.now()+'-r'+i,q:0,type:'Ressalva',body,status:'pendente',reason:''}));
  if(position==='Reprovo'&&justification)manif.push({id:'m'+Date.now()+'-j',q:0,type:'Reprovação',body:justification,status:'pendente',reason:''});
  const qs=v23Qs(x).filter(q=>q.type!=='vote'),finalResponses=qs.map((q,i)=>String(fd.get('l4final'+i)||'').trim());
  if(qs.some((q,i)=>q.required&&!finalResponses[i]))return alert('Responda todas as considerações finais obrigatórias.');
