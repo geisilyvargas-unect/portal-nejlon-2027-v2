@@ -14,7 +14,7 @@ function rows(x){return reviews(x).flatMap(a=>(a.scenarioAnswers?.length?a.scena
 function csvDownload(name,records){const csv='\ufeff'+records.map(row=>row.map(v=>'"'+String(v??'').replace(/"/g,'""')+'"').join(';')).join('\r\n');const blob=new Blob([csv],{type:'text/csv;charset=utf-8'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),2000)}
 window.l5Export=function(){if(roles()!=='prescon')return alert('Exportação administrativa restrita à PRESCON.');const x=d(),r=[['Deliberação','EJ','Cenário','Voto original','Resultado efetivo','Justificativa','Sugestões','Ressalvas','Parecer PRESCON','Data']];for(const y of rows(x)){const m=getManifest(y.a,y.i,'Ressalva');r.push([x.title,EJS[y.a.ej],y.scenario,normalize(y.vote),effective(y.vote,m),y.justification,y.suggestions,y.caveats,m?.reason||'',y.a.submittedAt||''])}csvDownload('deliberacao-completa-'+x.id+'.csv',r)};
 const previousReview=review;
-review=function(aid,mid,result){if(roles()!=='prescon')return alert('Somente a PRESCON pode analisar manifestações.');const a=db.answers.find(v=>v.id===aid),m=a?.manif?.find(v=>v.id===mid);if(!m||m.status!=='pendente')return alert('Manifestação não está pendente.');const reason=document.getElementById('reason-'+mid)?.value.trim();if(!reason)return alert('Parecer obrigatório.');previousReview(aid,mid,result);audit('review',{aid,mid,result,reason});save()};
+review=function(aid,mid,result){if(roles()!=='prescon')return alert('Somente a PRESCON pode analisar manifestações.');const a=db.answers.find(v=>v.id===aid),m=a?.manif?.find(v=>v.id===mid);if(!m||m.status!=='pendente')return alert('Manifestação não está pendente.');if(!d().closed)return alert('A auditoria só começa após o encerramento.');if(d().auditFinalizedAt)return alert('A auditoria já foi finalizada.');const reason=document.getElementById('reason-'+mid)?.value.trim()||'';m.status=result;m.reason=reason;m.reviewedAt=new Date().toISOString();audit('review',{aid,mid,result,reason});save();render()};
 const previousAnalyses=analyses;
 analyses=function(){if(roles()!=='prescon')return '<div class="notice">Acesso restrito à PRESCON.</div>';return previousAnalyses()+`<div class="card"><h3>Solicitações de alteração de voto</h3>${(db.voteChangeRequests||[]).filter(r=>r.delib===d().id).map(r=>`<div class="editor-q"><p><b>${E(EJS[r.ej])}</b> · ${E(r.reason)} · ${E(r.status)}</p>${r.status==='pending'?`<button class="btn" onclick="l5DecideRequest('${E(r.id)}','approved')">Autorizar</button> <button class="btn outline" onclick="l5DecideRequest('${E(r.id)}','rejected')">Recusar</button>`:''}</div>`).join('')||'<p>Nenhuma solicitação.</p>'}</div>`};
 window.l5RequestChange=function(){if(roles()!=='conselho')return;const x=d(),ej=login.ej;if(!answer(x.id,ej))return alert('Ainda não há resposta registrada.');db.voteChangeRequests??=[];if(db.voteChangeRequests.some(r=>r.delib===x.id&&r.ej===ej&&r.status==='pending'))return alert('Já existe uma solicitação pendente.');const reason=prompt('Explique por que deseja alterar o voto:')?.trim();if(!reason)return;db.voteChangeRequests.push({id:'vr-'+Date.now(),delib:x.id,ej,reason,status:'pending',at:new Date().toISOString()});audit('vote-change-request',{delib:x.id,ej,reason});save();render()};
@@ -33,9 +33,35 @@ function summary(x,anonymous){
  html+=`<div class="card"><h3>Considerações finais</h3><p>Clareza média: ${avg('clarity')} · Dificuldade média: ${avg('difficulty')}</p>${a.filter(v=>v.improve).map(v=>`<p><b>${E(EJS[v.ej])}:</b> ${E(v.improve)}</p>`).join('')}</div><div class="card"><h3>Manifestações e pareceres</h3>${data.flatMap(y=>(y.a.manif||[]).filter(m=>m.q===y.i).map(m=>`<p><b>${E(EJS[y.a.ej])} · ${E(m.type)}:</b> ${E(m.body)}<br>Parecer: ${E(m.reason||'Pendente')}</p>`)).join('')||'<p>Nenhuma manifestação.</p>'}</div><div class="actions"><button class="btn" onclick="l5Export()">Exportar CSV administrativo</button><button class="btn outline" onclick="l5Publish()">Publicar versão anonimizada</button></div>`;}
  return html;
 }
-window.l5Publish=function(){if(roles()!=='prescon')return alert('Acesso restrito.');const x=d();if(!x.closed)return alert('Encerre a deliberação antes de publicar o relatório.');x.publicReports??=[];const version=x.publicReports.length+1;const snapshot=summary(x,true);x.publicReports.push({version,html:snapshot,at:new Date().toISOString()});audit('publish-anonymous-report',{id:x.id,version});save();render()};
+window.l5Publish=function(){if(roles()!=='prescon')return alert('Acesso restrito.');const x=d();if(!x.closed)return alert('Encerre a deliberação antes de publicar o relatório.');if(!x.auditFinalizedAt)return alert('Finalize a auditoria antes de publicar o relatório.');x.publicReports??=[];const version=x.publicReports.length+1;const snapshot=summary(x,true);x.publicReports.push({version,html:snapshot,at:new Date().toISOString()});audit('publish-anonymous-report',{id:x.id,version});save();render()};
 const oldReport=report;
 report=function(){const x=d();if(roles()==='prescon')return summary(x,false);const latest=x.publicReports?.at(-1);return latest?latest.html+'<p class="tiny">Versão '+latest.version+' · '+E(latest.at)+'</p>':'<div class="card"><h2>Relatório ainda não publicado</h2><p>A versão anonimizada será disponibilizada após o encerramento e publicação pela PRESCON.</p></div>'};
+
+/* Fluxo de auditoria V2.0: encerramento -> análise -> finalização -> publicação.
+   Controles locais de demonstração; não substituem validação no servidor. */
+const auditPending=x=>reviews(x).flatMap(a=>(a.manif||[]).filter(m=>m.type==='Ressalva'&&m.status!=='aceita'&&m.status!=='recusada'));
+window.l5FinalizeAudit=function(){
+ if(roles()!=='prescon')return alert('Ação exclusiva da PRESCON.');
+ const x=d();
+ if(!x.closed)return alert('A deliberação precisa estar encerrada.');
+ if(x.auditFinalizedAt)return alert('Auditoria já finalizada.');
+ const pending=auditPending(x);
+ if(pending.length)return alert('Ainda existem '+pending.length+' ressalva(s) pendente(s).');
+ if(!confirm('Finalizar a auditoria? Os pareceres ficarão bloqueados.'))return;
+ x.auditFinalizedAt=new Date().toISOString();
+ audit('finalize-audit',{delib:x.id,at:x.auditFinalizedAt});
+ save();render();
+};
+const previousReportV20=report;
+report=function(){
+ const html=previousReportV20();
+ if(roles()!=='prescon')return html;
+ const x=d(),pending=auditPending(x).length;
+ const status=!x.closed?'Aguardando encerramento':x.auditFinalizedAt?'Auditoria finalizada':'Em auditoria';
+ const action=x.closed&&!x.auditFinalizedAt?
+ '<button class="btn red" onclick="l5FinalizeAudit()" '+(pending?'disabled':'')+'>FINALIZAR AUDITORIA</button>':'';
+ return '<section class="card" aria-label="Etapa de auditoria"><h3>FLUXO INSTITUCIONAL · V2.0</h3><p><b>Estado:</b> '+E(status)+' · <b>Ressalvas pendentes:</b> '+pending+'</p><p class="tiny">A publicação do relatório exige a finalização prévia da auditoria. Dados ainda locais neste protótipo.</p>'+action+'</section>'+html;
+};
 
 /* Painel de acompanhamento V2.0 — somente visual, sem simular backend. */
 const previousRenderV20=render;
