@@ -104,7 +104,7 @@ render=function(){
   const panel=document.createElement('section');
   panel.id='v20-roadmap';
   panel.setAttribute('aria-label','Estado da versão 2.0');
-  panel.innerHTML='<div class="v20-eyebrow">PORTAL NEJLON 2027 · EVOLUÇÃO V2.0</div><h2>DO PROTÓTIPO À DELIBERAÇÃO REAL.</h2><p>Esta versão ainda é demonstrativa: os votos e cadastros são armazenados neste navegador. Não utilize para deliberações oficiais.</p><div class="v20-grid"><div><b>01 · ESTRUTURA</b><span>Interface e visualização financeira existentes</span></div><div><b>02 · SEGURANÇA</b><span>Autenticação e banco compartilhado pendentes</span></div><div><b>03 · VOTAÇÃO</b><span>Voto único por EJ em desenvolvimento</span></div><div><b>04 · RESULTADOS</b><span>Auditoria e relatório PDF pendentes</span></div></div><small>Prévia visual de acompanhamento — não representa funcionalidades concluídas.</small>';
+  panel.innerHTML='<div class="v20-eyebrow">PORTAL NEJLON 2027 · EVOLUÇÃO V2.0</div><h2>DO PROTÓTIPO À DELIBERAÇÃO REAL.</h2><p>Esta versão ainda é demonstrativa: os votos e cadastros são armazenados neste navegador. Não utilize para deliberações oficiais.</p><div class="v20-grid"><div><b>01 · ESTRUTURA</b><span>Interface e visualização financeira existentes</span></div><div><b>02 · SEGURANÇA</b><span>Autenticação e banco compartilhado pendentes</span></div><div><b>03 · VOTAÇÃO</b><span>Voto único por EJ em desenvolvimento</span></div><div><b>04 · RESULTADOS</b><span>Auditoria e relatório PDF pendentes</span></div></div><small>Prévia visual de acompanhamento — não representa funcionalidades concluídas.</small><p><a class="v20-backend-link" href="./backend-preview.html" target="_blank" rel="noopener noreferrer">TESTAR LOGIN REAL E CONSULTA AO BANCO ↗</a></p>';
   const main=root.querySelector('.content')||root;
   main.prepend(panel);
 };
@@ -119,7 +119,7 @@ roadmapStyle.textContent=`
 #v20-roadmap .v20-grid>div{background:#111;color:#fff;padding:14px 16px;display:grid;gap:7px;border:1px solid #fff}
 #v20-roadmap .v20-grid b{color:#ff3b3b;font-size:12px;letter-spacing:.5px}
 #v20-roadmap .v20-grid span{font-size:12px;line-height:1.5}
-#v20-roadmap small{color:#111;font-size:10px;font-weight:800}
+#v20-roadmap small{color:#111;font-size:10px;font-weight:800}\n#v20-roadmap .v20-backend-link{display:inline-block;background:#111;color:#fff;text-decoration:none;font-size:12px;font-weight:900;padding:12px 16px;border:1px solid #fff}
 @media(max-width:720px){#v20-roadmap{padding:18px;box-shadow:4px 4px 0 #111}#v20-roadmap .v20-grid{grid-template-columns:1fr}}
 `;
 document.head.appendChild(roadmapStyle);
