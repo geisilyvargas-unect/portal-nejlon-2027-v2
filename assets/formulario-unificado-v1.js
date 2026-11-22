@@ -29,7 +29,7 @@ function refresh(){
   const vote=form.querySelector('[name="l4vote'+i+'"]:checked')?.value;
   const why=form.querySelector('[name="l4why'+i+'"]'),sug=form.querySelector('[name="l4suggest'+i+'"]'),cav=form.querySelector('[name="l4caveat'+i+'"]');
   const sb=document.getElementById('l4suggestbox'+i),cb=document.getElementById('l4caveatbox'+i);
-  if(sb)sb.hidden=vote!=='Aprova com sugestões';if(cb)cb.hidden=vote!=='Aprova com ressalvas';
+  if(sb)sb.hidden=vote!=='Aprovo com sugestões';if(cb)cb.hidden=vote!=='Aprovo com ressalvas';
   if(sug)sug.required=vote==='Aprovo com sugestões';if(cav)cav.required=vote==='Aprovo com ressalvas';if(why)why.required=vote==='Reprovo';
   const label=document.getElementById('l4whylabel'+i);if(label)label.textContent=vote==='Reprovo'?'*':'(opcional)';
   const hint=document.getElementById('l4hint'+i);if(hint)hint.textContent=vote==='Aprovo com ressalvas'?'A PRESCON avaliará as condições antes da apuração efetiva.':vote==='Aprovo com sugestões'?'Conta como aprovação; sugestões seguem para análise.':'';
