@@ -1,7 +1,7 @@
 /* Portal NEJLON — formulário de deliberação V2.4 (protótipo local) */
 (function(){
 'use strict';
-const validVote=new Set(['Aprova','Aprova com sugestões','Aprova com ressalvas','Reprova','Abstem']);
+const validVote=new Set(['Aprovo','Aprovo com sugestões','Aprovo com ressalvas','Reprovo','Abstenho','Aprova','Aprova com sugestões','Aprova com ressalvas','Reprova','Abstem']);
 const needsReason=v=>['Aprova com sugestões','Aprova com ressalvas','Reprova'].includes(v);
 const safe=x=>esc(String(x??''));
 const oldParticipant=v23Participant;
