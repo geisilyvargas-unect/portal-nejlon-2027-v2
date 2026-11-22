@@ -2,9 +2,9 @@
 (function(){
 'use strict';
 const E=x=>esc(String(x??''));
-const choices=['Aprova','Aprova com sugestões','Aprova com ressalvas','Reprova','Abstenho'];
+const choices=['Aprovo','Aprovo com sugestões','Aprovo com ressalvas','Reprovo','Abstenho'];
 const scenarios=x=>Array.isArray(x.scenarios)?x.scenarios:[];
-const mandatory=v=>v==='Aprova com sugestões'?'suggestions':v==='Aprova com ressalvas'?'caveats':v==='Reprova'?'justification':null;
+const mandatory=v=>v==='Aprovo com sugestões'?'suggestions':v==='Aprovo com ressalvas'?'caveats':v==='Reprovo'?'justification':null;
 const field=(name)=>document.querySelector('[name="'+name+'"]');
 const oldParticipant=v23Participant;
 v23Participant=function(){
@@ -30,10 +30,10 @@ function refresh(){
   const why=form.querySelector('[name="l4why'+i+'"]'),sug=form.querySelector('[name="l4suggest'+i+'"]'),cav=form.querySelector('[name="l4caveat'+i+'"]');
   const sb=document.getElementById('l4suggestbox'+i),cb=document.getElementById('l4caveatbox'+i);
   if(sb)sb.hidden=vote!=='Aprova com sugestões';if(cb)cb.hidden=vote!=='Aprova com ressalvas';
-  if(sug)sug.required=vote==='Aprova com sugestões';if(cav)cav.required=vote==='Aprova com ressalvas';if(why)why.required=vote==='Reprova';
-  const label=document.getElementById('l4whylabel'+i);if(label)label.textContent=vote==='Reprova'?'*':'(opcional)';
-  const hint=document.getElementById('l4hint'+i);if(hint)hint.textContent=vote==='Aprova com ressalvas'?'A PRESCON avaliará as condições antes da apuração efetiva.':vote==='Aprova com sugestões'?'Conta como aprovação; sugestões seguem para análise.':'';
-  if(vote&&(!mandatory(vote)||(vote==='Reprova'?why:vote==='Aprova com sugestões'?sug:cav)?.value.trim()))done++;
+  if(sug)sug.required=vote==='Aprovo com sugestões';if(cav)cav.required=vote==='Aprovo com ressalvas';if(why)why.required=vote==='Reprovo';
+  const label=document.getElementById('l4whylabel'+i);if(label)label.textContent=vote==='Reprovo'?'*':'(opcional)';
+  const hint=document.getElementById('l4hint'+i);if(hint)hint.textContent=vote==='Aprovo com ressalvas'?'A PRESCON avaliará as condições antes da apuração efetiva.':vote==='Aprovo com sugestões'?'Conta como aprovação; sugestões seguem para análise.':'';
+  if(vote&&(!mandatory(vote)||(vote==='Reprovo'?why:vote==='Aprovo com sugestões'?sug:cav)?.value.trim()))done++;
  });
  const label=document.getElementById('l4Progress'),bar=document.getElementById('l4Bar');if(label)label.textContent=done+' / '+sc.length+' cenários concluídos';if(bar)bar.value=done;
 }
@@ -49,10 +49,10 @@ v23Submit=function(ev){
  for(let i=0;i<sc.length;i++){
   const position=String(fd.get('l4vote'+i)||''),justification=String(fd.get('l4why'+i)||'').trim(),suggestions=String(fd.get('l4suggest'+i)||'').trim(),caveats=String(fd.get('l4caveat'+i)||'').trim();
   if(!choices.includes(position))return alert('Responda o cenário '+(i+1));
-  if(position==='Reprova'&&!justification||position==='Aprova com sugestões'&&!suggestions||position==='Aprova com ressalvas'&&!caveats)return alert('Complete a justificativa, sugestão ou ressalva do cenário '+(i+1));
-  votes.push(position);scenarioAnswers.push({scenario:sc[i].name,position,justification,suggestions:position==='Aprova com sugestões'?suggestions:'',caveats:position==='Aprova com ressalvas'?caveats:''});
-  const body=position==='Reprova'?justification:position==='Aprova com sugestões'?suggestions:position==='Aprova com ressalvas'?caveats:'';
-  if(body)manif.push({id:'m'+Date.now()+'-'+i,q:i,type:position==='Reprova'?'Reprovação':position==='Aprova com sugestões'?'Sugestão':'Ressalva',body,status:'pendente',reason:'',justification});
+  if(position==='Reprovo'&&!justification||position==='Aprovo com sugestões'&&!suggestions||position==='Aprovo com ressalvas'&&!caveats)return alert('Complete a justificativa, sugestão ou ressalva do cenário '+(i+1));
+  votes.push(position);scenarioAnswers.push({scenario:sc[i].name,position,justification,suggestions:position==='Aprovo com sugestões'?suggestions:'',caveats:position==='Aprovo com ressalvas'?caveats:''});
+  const body=position==='Reprovo'?justification:position==='Aprovo com sugestões'?suggestions:position==='Aprovo com ressalvas'?caveats:'';
+  if(body)manif.push({id:'m'+Date.now()+'-'+i,q:i,type:position==='Reprovo'?'Reprovação':position==='Aprovo com sugestões'?'Sugestão':'Ressalva',body,status:'pendente',reason:'',justification});
  }
  const qs=v23Qs(x).filter(q=>q.type!=='vote'),finalResponses=qs.map((q,i)=>String(fd.get('l4final'+i)||'').trim());
  if(qs.some((q,i)=>q.required&&!finalResponses[i]))return alert('Responda todas as considerações finais obrigatórias.');
