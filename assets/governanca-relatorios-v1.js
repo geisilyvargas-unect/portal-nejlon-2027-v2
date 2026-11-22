@@ -81,6 +81,11 @@ report=function(){
 /* Painel de acompanhamento V2.0 — somente visual, sem simular backend. */
 const previousRenderV20=render;
 render=function(){
+  // Fechamento local de demonstração: aplicado quando uma página é renderizada.
+  // O sistema definitivo precisa de validação de prazo no servidor.
+  let changed=false;
+  for(const x of db.delibs){if(x.published&&!x.closed&&x.deadline){const until=new Date(x.deadline).getTime();if(Number.isFinite(until)&&Date.now()>=until){x.closed=true;x.closedAt=new Date().toISOString();changed=true;}}}
+  if(changed)save();
   previousRenderV20();
   if(login?.role!=='prescon')return;
   const root=document.getElementById('root');
