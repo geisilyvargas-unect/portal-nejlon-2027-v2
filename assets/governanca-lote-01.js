@@ -64,3 +64,63 @@ v23Editor=function(){
 };
 render();
 })();
+/* Correção de acesso: PRESCON = administrador do Núcleo, sem EJ vinculada. */
+(function(){
+ const oldLoginScreenRefresh=loginScreenRefresh;
+ loginScreenRefresh=function(){
+   const roleField=document.getElementById('loginRole');
+   const box=document.getElementById('loginEjBox');
+   if(box&&roleField)box.style.display=roleField.value==='prescon'?'none':'block';
+ };
+ const oldDoLogin=doLogin;
+ doLogin=function(){
+   const selectedRole=document.getElementById('loginRole')?.value;
+   if(!['prescon','conselho','direx'].includes(selectedRole))return alert('Escolha um perfil válido.');
+   if(selectedRole!=='prescon'&&!document.getElementById('loginEj')?.value)return alert('Selecione a EJ.');
+   oldDoLogin();
+   if(login?.role==='prescon'){
+     login.ej=null;
+     sessionStorage.setItem('nejlon-login',JSON.stringify(login));
+     state.ej=null;
+   }
+   render();
+ };
+ const oldNav=nav;
+ nav=function(){
+   oldNav();
+   const n=document.getElementById('nav');
+   if(!n)return;
+   const role=login?.role;
+   for(const b of Array.from(n.querySelectorAll('button'))){
+     const action=b.getAttribute('onclick')||'';
+     const isAdmin=/go\('\/prescon|go\('\/relatorios/.test(action);
+     const isVote=/go\('\/deliberar/.test(action);
+     const isDirex=/go\('\/direx/.test(action);
+     if((role!=='prescon'&&isAdmin)||(role==='direx'&&isVote)||(role==='prescon'&&isDirex)||(role==='conselho'&&isDirex))b.remove();
+   }
+ };
+ const oldRender=render;
+ render=function(){
+   oldRender();
+   document.body.classList.toggle('nejlon-unauthenticated',!login);
+   if(!login){
+     document.querySelectorAll('.loginwall').forEach((e,i)=>{if(i)e.remove()});
+     loginScreenRefresh();
+     return;
+   }
+   const p=document.getElementById('persona');
+   if(p&&login.role==='prescon')p.innerHTML='PRESCON · ADMINISTRADOR DO NÚCLEO <button class="btn light" onclick="logout()" style="margin-left:10px">Sair</button>';
+   const path=location.hash.slice(1)||'/prescon';
+   const isAdmin=/^\/(prescon|relatorios)(\/|$)/.test(path);
+   const isVote=/^\/deliberar(\/|$)/.test(path);
+   const isDirex=/^\/direx(\/|$)/.test(path);
+   if((isAdmin&&login.role!=='prescon')||(isVote&&login.role==='direx')||(isDirex&&login.role!=='direx')){
+     const root=document.getElementById('root');
+     if(root)root.innerHTML='<div class="card" role="alert"><h2>Acesso não autorizado</h2><p>A área administrativa pertence exclusivamente à PRESCON. Escolha o perfil correto na entrada.</p><button class="btn" onclick="logout()">Trocar perfil</button></div>';
+   }
+ };
+ const style=document.createElement('style');
+ style.textContent='body.nejlon-unauthenticated .app{visibility:hidden;pointer-events:none}body.nejlon-unauthenticated .loginwall{visibility:visible;pointer-events:auto}';
+ document.head.appendChild(style);
+ render();
+})();
