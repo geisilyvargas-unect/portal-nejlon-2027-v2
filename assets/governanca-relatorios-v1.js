@@ -8,11 +8,21 @@ const official=['Aprovo','Aprovo com sugestões','Aprovo com ressalvas','Reprovo
 const scenarios=x=>x.scenarios?.length?x.scenarios.map(s=>s.name):x.questions||[];
 const reviews=x=>db.answers.filter(a=>a.delib===x.id);
 const audit=(action,detail)=>{db.auditLog??=[];db.auditLog.push({action,detail,at:new Date().toISOString(),actor:roles(),ej:login?.ej||null});};
-const effective=(vote,manifest)=>{const v=normalize(vote);if(v==='Aprovo'||v==='Aprovo com sugestões')return 'Aprovação confirmada';if(v==='Reprovo')return 'Reprovação confirmada';if(v==='Abstenho')return 'Abstenção';if(v==='Aprovo com ressalvas'){if(manifest?.status==='aceita')return 'Aprovação confirmada';if(manifest?.status==='recusada')return 'Reprovação confirmada';return 'Ressalva pendente';}return 'Não classificado';};
-function getManifest(a,i,type){return (a.manif||[]).find(m=>m.q===i&&m.type===type)}
-function rows(x){return reviews(x).flatMap(a=>(a.scenarioAnswers?.length?a.scenarioAnswers.map((s,i)=>({a,i,vote:s.position,scenario:s.scenario,justification:s.justification||'',suggestions:s.suggestions||'',caveats:s.caveats||''})):(a.votes||[]).map((v,i)=>({a,i,vote:v,scenario:scenarios(x)[i]||'Cenário '+(i+1),justification:'',suggestions:'',caveats:''}))));}
+const effective=(vote,manifests=[])=>{
+ const v=normalize(vote);
+ if(v==='Aprovo'||v==='Aprovo com sugestões')return 'Aprovação confirmada';
+ if(v==='Reprovo')return 'Reprovação confirmada';
+ if(v==='Abstenho')return 'Abstenção';
+ if(v==='Aprovo com ressalvas'){
+  const caveats=manifests.filter(m=>m.type==='Ressalva');
+  if(!caveats.length||caveats.some(m=>!['aceita','recusada'].includes(m.status)))return 'Ressalva pendente';
+  return caveats.every(m=>m.status==='aceita')?'Aprovação confirmada':'Reprovação confirmada';
+ }
+ return 'Não classificado';
+};
+function rows(x){return reviews(x).map(a=>({a,i:0,vote:a.institutionalVote||a.votes?.[0]||'',scenario:'Deliberação integral',justification:'',suggestions:(a.manif||[]).filter(m=>m.type==='Sugestão').map(m=>m.body).join('; '),caveats:(a.manif||[]).filter(m=>m.type==='Ressalva').map(m=>m.body).join('; ')}));}
 function csvDownload(name,records){const csv='\ufeff'+records.map(row=>row.map(v=>'"'+String(v??'').replace(/"/g,'""')+'"').join(';')).join('\r\n');const blob=new Blob([csv],{type:'text/csv;charset=utf-8'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),2000)}
-window.l5Export=function(){if(roles()!=='prescon')return alert('Exportação administrativa restrita à PRESCON.');const x=d(),r=[['Deliberação','EJ','Cenário','Voto original','Resultado efetivo','Justificativa','Sugestões','Ressalvas','Parecer PRESCON','Data']];for(const y of rows(x)){const m=getManifest(y.a,y.i,'Ressalva');r.push([x.title,EJS[y.a.ej],y.scenario,normalize(y.vote),effective(y.vote,m),y.justification,y.suggestions,y.caveats,m?.reason||'',y.a.submittedAt||''])}csvDownload('deliberacao-completa-'+x.id+'.csv',r)};
+window.l5Export=function(){if(roles()!=='prescon')return alert('Exportação administrativa restrita à PRESCON.');const x=d(),r=[['Deliberação','EJ','Cenário','Voto original','Resultado efetivo','Justificativa','Sugestões','Ressalvas','Parecer PRESCON','Data']];for(const y of rows(x)){const m=(y.a.manif||[]).filter(m=>m.type==='Ressalva');r.push([x.title,EJS[y.a.ej],y.scenario,normalize(y.vote),effective(y.vote,m),y.justification,y.suggestions,y.caveats,m.map(v=>v.reason||'').join('; '),y.a.submittedAt||''])}csvDownload('deliberacao-completa-'+x.id+'.csv',r)};
 const previousReview=review;
 review=function(aid,mid,result){if(roles()!=='prescon')return alert('Somente a PRESCON pode analisar manifestações.');const a=db.answers.find(v=>v.id===aid),m=a?.manif?.find(v=>v.id===mid);if(!m||m.status!=='pendente')return alert('Manifestação não está pendente.');if(!d().closed)return alert('A auditoria só começa após o encerramento.');if(d().auditFinalizedAt)return alert('A auditoria já foi finalizada.');const reason=document.getElementById('reason-'+mid)?.value.trim()||'';m.status=result;m.reason=reason;m.reviewedAt=new Date().toISOString();audit('review',{aid,mid,result,reason});save();render()};
 const previousAnalyses=analyses;
@@ -22,15 +32,20 @@ window.l5DecideRequest=function(id,status){if(roles()!=='prescon')return;const r
 const oldParticipant=v23Participant;
 v23Participant=function(){const html=oldParticipant(),x=d();if(roles()==='conselho'&&answer(x.id,login.ej))return html+`<div class="card"><h3>Solicitar alteração do voto</h3><p>Uma nova resposta só poderá ser registrada mediante autorização da PRESCON. Esta demonstração registra o pedido, mas ainda não executa a substituição.</p><button class="btn outline" onclick="l5RequestChange()">Solicitar autorização</button></div>`;return html};
 function summary(x,anonymous){
- const a=reviews(x),data=rows(x),sc=scenarios(x),n=Object.keys(EJS).length;
- let html=hero('RELATÓRIO / '+(anonymous?'CONSELHO':'PRESCON'),'RESULTADOS<br>POR CENÁRIO.','Contagens informativas; aprovação formal depende do Regimento Interno.');
- html+=`<div class="grid">${metric(a.length,'EJs participantes')}${metric(n-a.length,'EJs pendentes')}${metric(n?(100*a.length/n).toFixed(1)+'%':'0%','Representatividade')}</div>`;
- for(let i=0;i<sc.length;i++){
-  const entries=data.filter(r=>r.i===i),counts=official.map(v=>entries.filter(r=>normalize(r.vote)===v).length),pending=entries.filter(r=>effective(r.vote,getManifest(r.a,i,'Ressalva'))==='Ressalva pendente').length;
-  html+=`<div class="card"><h3>${i+1}. ${E(sc[i])}</h3>${official.map((v,j)=>`<div class="report-row"><span class="name">${v}</span><div class="bar"><div style="width:${entries.length?counts[j]/entries.length*100:0}%"></div></div><b>${counts[j]} (${entries.length?(100*counts[j]/entries.length).toFixed(1):'0'}%)</b></div>`).join('')}<p><b>${pending?'Apuração não consolidada: '+pending+' ressalva(s) pendente(s).':'Nenhuma ressalva pendente neste cenário.'}</b></p><p>${['Aprovação confirmada','Reprovação confirmada','Ressalva pendente','Abstenção'].map(status=>status+': '+entries.filter(r=>effective(r.vote,getManifest(r.a,i,'Ressalva'))===status).length).join(' · ')}</p></div>`;
+ const entries=rows(x),n=Object.keys(EJS).length;
+ const counts=official.map(v=>entries.filter(r=>normalize(r.vote)===v).length);
+ const effectiveCounts=['Aprovação confirmada','Reprovação confirmada','Ressalva pendente','Abstenção'].map(status=>entries.filter(r=>effective(r.vote,r.a.manif||[])===status).length);
+ const valid=effectiveCounts[0]+effectiveCounts[1];
+ const outcome=effectiveCounts[2]?'EM AUDITORIA':!valid?'SEM VOTOS VÁLIDOS':effectiveCounts[0]>effectiveCounts[1]?'APROVADO':effectiveCounts[1]>effectiveCounts[0]?'REPROVADO':'EMPATE';
+ let html=hero('RELATÓRIO / '+(anonymous?'CONSELHO':'PRESCON'),'RESULTADO<br>INSTITUCIONAL.','Uma decisão por EJ para toda a deliberação.');
+ html+='<div class="grid">'+metric(entries.length,'EJs participantes')+metric(Math.max(0,n-entries.length),'EJs pendentes')+metric(n?(100*entries.length/n).toFixed(1)+'%':'0%','Participação')+metric(outcome,'Resultado')+'</div>';
+ html+='<div class="card"><h3>Votos institucionais</h3>'+official.map((v,j)=>'<div class="report-row"><span class="name">'+E(v)+'</span><div class="bar"><div style="width:'+(entries.length?counts[j]/entries.length*100:0)+'%"></div></div><b>'+counts[j]+'</b></div>').join('')+'<p>'+['Favoráveis','Contrários','Ressalvas pendentes','Abstenções'].map((label,i)=>label+': '+effectiveCounts[i]).join(' · ')+'</p></div>';
+ if(!anonymous){
+  html+='<div class="card"><h3>Manifestações e pareceres</h3>'+entries.flatMap(y=>(y.a.manif||[]).map(m=>'<p><b>'+E(EJS[y.a.ej])+' · '+E(m.type)+':</b> '+E(m.body)+'<br>Decisão: '+E(m.status||'Pendente')+(m.reason?'<br>Parecer: '+E(m.reason):'')+'</p>')).join('')+'</div>';
+  html+='<div class="actions"><button class="btn outline" onclick="window.print()">Imprimir relatório</button><button class="btn red" onclick="l5Publish()" '+(!x.auditFinalizedAt?'disabled':'')+'>PUBLICAR RELATÓRIO FINAL</button></div>';
+ }else{
+  html+='<div class="card"><h3>Manifestações</h3>'+entries.flatMap(y=>(y.a.manif||[]).map(m=>'<p><b>'+E(m.type)+':</b> '+E(m.body)+'<br>Decisão: '+E(m.status||'Pendente')+'</p>')).join('')+'</div>';
  }
- if(!anonymous){const scales=k=>a.map(v=>v[k]).filter(v=>v!==''&&v!==null&&v!==undefined).map(Number).filter(v=>Number.isFinite(v)&&v>=0&&v<=5);const avg=k=>{const z=scales(k);return z.length?(z.reduce((u,v)=>u+v,0)/z.length).toFixed(2):'—'};
- html+=`<div class="card"><h3>Considerações finais</h3><p>Clareza média: ${avg('clarity')} · Dificuldade média: ${avg('difficulty')}</p>${a.filter(v=>v.improve).map(v=>`<p><b>${E(EJS[v.ej])}:</b> ${E(v.improve)}</p>`).join('')}</div><div class="card"><h3>Manifestações e pareceres</h3>${data.flatMap(y=>(y.a.manif||[]).filter(m=>m.q===y.i).map(m=>`<p><b>${E(EJS[y.a.ej])} · ${E(m.type)}:</b> ${E(m.body)}<br>Parecer: ${E(m.reason||'Pendente')}</p>`)).join('')||'<p>Nenhuma manifestação.</p>'}</div><div class="actions"><button class="btn" onclick="l5Export()">Exportar CSV administrativo</button><button class="btn outline" onclick="l5Publish()">Publicar versão anonimizada</button></div>`;}
  return html;
 }
 window.l5Publish=function(){if(roles()!=='prescon')return alert('Acesso restrito.');const x=d();if(!x.closed)return alert('Encerre a deliberação antes de publicar o relatório.');if(!x.auditFinalizedAt)return alert('Finalize a auditoria antes de publicar o relatório.');x.publicReports??=[];const version=x.publicReports.length+1;const snapshot=summary(x,true);x.publicReports.push({version,html:snapshot,at:new Date().toISOString()});audit('publish-anonymous-report',{id:x.id,version});save();render()};
