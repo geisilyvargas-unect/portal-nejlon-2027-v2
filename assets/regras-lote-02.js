@@ -95,11 +95,25 @@ v23Participant=function(){
  if(!sc.length)return html;
  const block=`<div class="card"><h3>Cenários financeiros a deliberar</h3><p class="tiny">Analise todos os cenários antes de enviar. As projeções são referências, não votos.</p>
  ${sc.map((s,i)=>`<div class="editor-q"><h3>${i+1}. ${esc2(s.name)}</h3><p>${esc2(s.description)}</p>${s.url?`<p><a target="_blank" rel="noopener noreferrer" href="${esc2(s.url)}">Consultar material do cenário</a></p>`:''}
- ${login?.role==='conselho'&&!answer(x.id,login.ej)&&x.published&&!x.closed?`<div class="field"><label>Posicionamento obrigatório sobre este cenário *</label><select name="l2scenario${i}" required><option value="">Selecione</option>${voteOptions.map(v=>`<option value="${v}">${v}</option>`).join('')}</select></div><div class="field"><label>Justificativa para reprovação, sugestão ou ressalva</label><textarea name="l2reason${i}" maxlength="5000"></textarea></div>`:''}</div>`).join('')}
+ ${login?.role==='conselho'&&!answer(x.id,login.ej)&&x.published&&!x.closed?`<fieldset class="vote-position-group"><legend>Sobre o [C${i+1}] CENÁRIO ${i+1}, você... *</legend><div class="vote-position-options" style="display:grid;gap:9px">${voteOptions.map(v=>`<label><input type="radio" name="l2scenario${i}" value="${v}" required onchange="l2VoteChanged(${i})"> ${v}</label>`).join('')}</div></fieldset><p class="tiny" id="l2hint${i}">Selecione a opção que representa o posicionamento da sua EJ.</p><div class="field"><label>Justifique sua decisão e insira seus pontos <span id="l2whylabel${i}">(opcional)</span></label><textarea name="l2reason${i}" maxlength="5000"></textarea></div><div class="field" id="l2suggestionswrap${i}" hidden><label>Sugestões de melhoria *</label><textarea name="l2suggestions${i}" maxlength="5000"></textarea></div><div class="field" id="l2caveatswrap${i}" hidden><label>Ressalvas / condições para aprovação *</label><textarea name="l2caveats${i}" maxlength="5000"></textarea></div>`:''}</div>`).join('')}
  <div class="line"></div><h3>Projeções de referência</h3>${Object.entries(getProjection(x)).map(([k,v])=>`<p><b>${k.toUpperCase()}:</b> ${esc2(v||'Não informado')}</p>`).join('')}</div>`;
  if(html.includes('<form id="v23Response"'))html=html.replace('<form id="v23Response" class="card">','<form id="v23Response" class="card">'+block);
  else html+=block;
  return html;
+};
+window.l2VoteChanged=function(i){
+ const selected=document.querySelector('input[name="l2scenario'+i+'"]:checked')?.value;
+ const suggestion=document.getElementById('l2suggestionswrap'+i),caveat=document.getElementById('l2caveatswrap'+i);
+ const why=document.querySelector('[name="l2reason'+i+'"]');
+ const sw=suggestion?.querySelector('textarea'),cw=caveat?.querySelector('textarea');
+ if(suggestion)suggestion.hidden=selected!=='Aprova com sugestões';
+ if(caveat)caveat.hidden=selected!=='Aprova com ressalvas';
+ if(sw){sw.required=selected==='Aprova com sugestões';if(!sw.required)sw.value='';}
+ if(cw){cw.required=selected==='Aprova com ressalvas';if(!cw.required)cw.value='';}
+ if(why)why.required=selected==='Reprova';
+ const label=document.getElementById('l2whylabel'+i);if(label)label.textContent=selected==='Reprova'?'*':'(opcional)';
+ const hint=document.getElementById('l2hint'+i);
+ if(hint)hint.textContent=selected==='Aprova com ressalvas'?'A ressalva dependerá da análise da PRESCON para contar como aprovação ou reprovação.':selected==='Aprova com sugestões'?'O voto conta como aprovação; a PRESCON analisará as sugestões.':selected==='Abstenho'?'Você optou por não votar neste cenário.':'';
 };
 const previousSubmit=v23Submit;
 v23Submit=function(ev){
@@ -109,10 +123,14 @@ v23Submit=function(ev){
  const fd=new FormData(ev.target),scenarioVotes=[],scenarioManif=[];
  for(let i=0;i<sc.length;i++){
   const vote=String(fd.get('l2scenario'+i)||''),reason=String(fd.get('l2reason'+i)||'').trim();
+  const suggestions=String(fd.get('l2suggestions'+i)||'').trim(),caveats=String(fd.get('l2caveats'+i)||'').trim();
   if(!voteOptions.includes(vote))return alert('Vote em todos os cenários.');
-  if(['Aprova com sugestões','Aprova com ressalvas','Reprova'].includes(vote)&&!reason)return alert('Justifique o voto no cenário '+(i+1)+'.');
+  if(vote==='Reprova'&&!reason)return alert('Justifique a reprovação no cenário '+(i+1)+'.');
+  if(vote==='Aprova com sugestões'&&!suggestions)return alert('Preencha as sugestões do cenário '+(i+1)+'.');
+  if(vote==='Aprova com ressalvas'&&!caveats)return alert('Preencha as condições do cenário '+(i+1)+'.');
   scenarioVotes.push(vote);
-  if(reason)scenarioManif.push({id:'l2m'+Date.now()+'-'+i,q:i,type:vote==='Aprova com sugestões'?'Sugestão':vote==='Aprova com ressalvas'?'Ressalva':'Reprovação',body:reason,status:'pendente',reason:''});
+  const body=vote==='Aprova com sugestões'?suggestions:vote==='Aprova com ressalvas'?caveats:vote==='Reprova'?reason:'';
+  if(body)scenarioManif.push({id:'l2m'+Date.now()+'-'+i,q:i,type:vote==='Aprova com sugestões'?'Sugestão':vote==='Aprova com ressalvas'?'Ressalva':'Reprovação',body,status:'pendente',reason:'',justification:reason});
  }
  const before=db.answers.length;
  previousSubmit(ev);
