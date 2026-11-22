@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>NEJLON · Conexão segura</title><style>
+:root{font-family:Arial,sans-serif;color:#fff;background:#111}*{box-sizing:border-box}body{margin:0;padding:24px}main{max-width:820px;margin:30px auto}.hero{background:#f00;color:white;padding:28px;border:3px solid #fff;box-shadow:8px 8px #333}h1{font-size:clamp(30px,6vw,62px);line-height:1;margin:12px 0;text-transform:uppercase;text-shadow:3px 3px #111}h2{margin:0 0 14px}.card{background:#191919;border:1px solid #555;padding:24px;margin-top:18px}label{display:block;margin:12px 0 6px;font-weight:bold}input{width:100%;padding:13px;background:#fff;color:#111;border:2px solid #fff;font-size:16px}button,.back{display:inline-block;padding:12px 18px;border:0;background:#f00;color:#fff;font-weight:bold;cursor:pointer;margin-top:16px;text-decoration:none}button:disabled{opacity:.5;cursor:wait}.muted{color:#bbb;font-size:13px}#status{min-height:24px}ul{padding-left:22px}li{margin:12px 0}strong{color:#ff5454}
+</style></head><body><main><a class="back" href="./">← Voltar ao protótipo</a><header class="hero"><small>PORTAL NEJLON 2027 · INTEGRAÇÃO EM TESTE</small><h1>ACESSO REAL.<br>DADOS PROTEGIDOS.</h1><p>Área de verificação da autenticação e leitura do banco existente. O portal demonstrativo permanece separado.</p></header>
+<section class="card" id="auth"><h2>Entrar com conta cadastrada</h2><form id="loginForm"><label for="email">E-mail</label><input id="email" type="email" autocomplete="username" required><label for="password">Senha</label><input id="password" type="password" autocomplete="current-password" required><button id="submit" type="submit">ENTRAR COM SEGURANÇA</button></form><p class="muted">A conta deve existir no Supabase Auth e ter um perfil ativo. Esta página não permite cadastro público.</p></section>
+<section class="card" id="private" hidden><h2>Sessão autenticada</h2><p id="identity"></p><h3>Deliberações autorizadas para leitura</h3><ul id="items"></ul><button id="logout">SAIR</button><p class="muted">A lista é filtrada pelas políticas de segurança do banco (RLS). Nenhum voto pode ser enviado nesta tela.</p></section><p id="status" role="status" aria-live="polite"></p>
+</main><script>
+(()=>{'use strict';
+const URL_BASE='https://imsisbixzkqphooxyfhr.supabase.co',KEY='sb_publishable_mS_TDGKZhUuJi-rxc5Nu1w_IXODeo-_';
+const $=id=>document.getElementById(id);let token=null;
+const status=t=>{$('status').textContent=t};
+async function request(path,method='GET',body){
+ const headers={'apikey':KEY,'Content-Type':'application/json'};
+ if(token)headers.Authorization='Bearer '+token;
+ const r=await fetch(URL_BASE+path,{method,headers,body:body?JSON.stringify(body):undefined,cache:'no-store'});
+ const data=await r.json().catch(()=>({}));
+ if(!r.ok)throw Error(data.msg||data.error_description||data.message||'Erro HTTP '+r.status);
+ return data;
+}
+$('loginForm').addEventListener('submit',async e=>{
+ e.preventDefault();$('submit').disabled=true;status('Validando credenciais...');
+ try{
+  const result=await request('/auth/v1/token?grant_type=password','POST',{email:$('email').value.trim(),password:$('password').value});
+  token=result.access_token;$('password').value='';
+  const user=await request('/auth/v1/user');
+  const profiles=await request('/rest/v1/profiles?select=id,full_name,email,role,active,ej_id&id=eq.'+encodeURIComponent(user.id));
+  const profile=profiles[0];if(!profile||!profile.active)throw Error('Conta sem perfil ativo no portal.');
+  const deliberations=await request('/rest/v1/deliberations?select=id,title,status,due_at&order=created_at.desc&limit=30');
+  $('identity').textContent=profile.full_name+' · '+profile.role+' · '+profile.email;
+  $('items').replaceChildren();
+  for(const d of deliberations){const li=document.createElement('li');const name=document.createElement('strong');name.textContent=d.title;li.append(name,document.createTextNode(' · '+d.status+' · Prazo: '+(d.due_at?new Date(d.due_at).toLocaleString('pt-BR'):'não definido')));$('items').append(li)}
+  if(!deliberations.length){const li=document.createElement('li');li.textContent='Nenhuma deliberação disponível para este perfil.';$('items').append(li)}
+  $('auth').hidden=true;$('private').hidden=false;status('Conexão autenticada. Consulta somente leitura.');
+ }catch(err){token=null;status('Não foi possível entrar: '+err.message)}
+ finally{$('submit').disabled=false}
+});
+$('logout').addEventListener('click',async()=>{try{await request('/auth/v1/logout','POST')}catch{}token=null;$('private').hidden=true;$('auth').hidden=false;status('Sessão encerrada nesta página.')});
+})();
+</script></body></html>
