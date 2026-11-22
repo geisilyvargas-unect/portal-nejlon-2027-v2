@@ -142,9 +142,37 @@ v23Submit=function(ev){
 };
 const previousV23Submit=v23Submit;
 const previousRender=render;
+function l2RefreshProgress(){
+ const form=document.getElementById('v23Response');if(!form)return;
+ const x=d(),sc=getScenarios(x);
+ if(!sc.length)return;
+ let completed=0;
+ for(let i=0;i<sc.length;i++){
+  const vote=form.querySelector('input[name="l2scenario'+i+'"]:checked')?.value;
+  const reason=form.querySelector('[name="l2reason'+i+'"]')?.value.trim();
+  const suggestions=form.querySelector('[name="l2suggestions'+i+'"]')?.value.trim();
+  const caveats=form.querySelector('[name="l2caveats'+i+'"]')?.value.trim();
+  if(vote&&(!(vote==='Reprova')||reason)&&(!(vote==='Aprova com sugestões')||suggestions)&&(!(vote==='Aprova com ressalvas')||caveats))completed++;
+ }
+ const label=document.getElementById('l2ProgressText'),bar=document.getElementById('l2ProgressBar');
+ if(label)label.textContent=completed+' / '+sc.length+' cenários concluídos';
+ if(bar){bar.value=completed;bar.max=sc.length;}
+}
+function l2AttachProgress(){
+ const form=document.getElementById('v23Response');if(!form||form.dataset.l2Progress)return;
+ const x=d(),sc=getScenarios(x);if(!sc.length)return;
+ form.dataset.l2Progress='1';
+ const block=document.createElement('div');block.className='card';block.style.marginBottom='15px';
+ block.innerHTML='<h3>Seu voto, passo a passo</h3><strong id="l2ProgressText">0 / '+sc.length+' cenários concluídos</strong><div><progress id="l2ProgressBar" max="'+sc.length+'" value="0" style="width:100%;height:16px"></progress></div><p class="tiny">O envio só será concluído depois de todos os cenários e perguntas finais obrigatórias.</p>';
+ form.prepend(block);
+ form.addEventListener('input',l2RefreshProgress);
+ form.addEventListener('change',l2RefreshProgress);
+ l2RefreshProgress();
+}
 render=function(){
  previousRender();
  if(!login)return;
+ l2AttachProgress();
  const x=d(),path=location.hash.slice(1);
  if(login.role==='prescon'&&path.startsWith('/prescon/editor/')){
   const root=document.getElementById('root');
