@@ -6,13 +6,16 @@ const choices=['Aprovo','Aprovo com sugestões','Aprovo com ressalvas','Reprovo'
 const scenarios=x=>Array.isArray(x.scenarios)?x.scenarios:[];
 const mandatory=v=>v==='Aprovo com sugestões'?'suggestions':v==='Aprovo com ressalvas'?'caveats':v==='Reprovo'?'justification':null;
 const field=(name)=>document.querySelector('[name="'+name+'"]');
+const approvedChange=(x,ej)=>(db.voteChangeRequests||[]).find(r=>r.delib===x.id&&r.ej===ej&&r.status==='approved'&&!r.usedAt);
 const oldParticipant=v23Participant;
 v23Participant=function(){
  const x=d(),sc=scenarios(x),ej=login?.ej;
- if(login?.role!=='conselho'||!x.published||x.closed||answer(x.id,ej))return oldParticipant();
+ if(login?.role!=='conselho'||!x.published||x.closed||(x.deadline&&Date.now()>=new Date(x.deadline).getTime())||(answer(x.id,ej)&&!approvedChange(x,ej)))return oldParticipant();
  const qs=v23Qs(x).filter(q=>q.type!=='vote');
+ const prior=answer(x.id,ej),revision=prior&&approvedChange(x,ej);
  let html=hero('CONSELHO / DELIBERAÇÃO','SUA VOZ<br>DECIDE.','Formulário completo · planejamento financeiro, cenários e considerações finais.');
  html+='<div class="formlook"><div class="card"><h2>'+E(x.title)+'</h2><p>Falaaaa, conselheiro pé vermelho! ❤️</p><p>'+E(x.desc)+'</p><p><b>EJ:</b> '+E(EJS[ej])+'</p></div>'+v23Rules();
+ if(revision)html+='<div class="notice"><b>ALTERAÇÃO AUTORIZADA:</b> você pode substituir o voto uma única vez antes do prazo. O voto anterior ficará no histórico.</div>';
  html+='<form id="v23Response" class="card"><h3>01 · Identificação</h3><div class="field"><label>Nome completo *</label><input name="name" required maxlength="160"></div><div class="field"><label>E-mail *</label><input type="email" name="email" required maxlength="200"></div><div class="field"><label>Empresa júnior</label><input readonly value="'+E(EJS[ej])+'"></div>';
  html+='<div class="line"></div><h3>02 · Planejamento financeiro</h3><p>'+E(x.file||'Nenhum XLSX vinculado')+'</p><div class="actions"><button type="button" class="btn outline" onclick="v23OpenPF()">Visualizar XLSX no portal</button><button type="button" class="btn light" onclick="v23DownloadPF()">Baixar arquivo original</button></div><div id="v23PFViewer"></div>';
  html+='<div class="line"></div><h3>03 · Cenários financeiros para consulta</h3><p>Os cenários são materiais de análise. A EJ registra apenas um voto institucional para toda a deliberação.</p>';
@@ -39,7 +42,8 @@ v23Submit=function(ev){
  ev.preventDefault();
  if(login?.role!=='conselho'||!login.ej||!EJS[login.ej])return alert('Acesso do Conselho inválido.');
  if(!x.published||x.closed||(x.deadline&&Date.now()>new Date(x.deadline).getTime()))return alert('A deliberação não está aberta para respostas.');
- if(answer(x.id,login.ej))return alert('Esta EJ já respondeu. Solicite autorização à PRESCON para alterar.');
+ const prior=answer(x.id,login.ej),permission=prior&&approvedChange(x,login.ej);
+ if(prior&&!permission)return alert('Esta EJ já respondeu. Solicite autorização à PRESCON para alterar.');
  if(!form.reportValidity())return;
  const fd=new FormData(form);
  const position=String(fd.get('l4vote0')||'');
@@ -59,9 +63,16 @@ v23Submit=function(ev){
  if(scales.some(v=>!['0','1','2','3','4','5'].includes(v)))return alert('Escala inválida.');
  if(!confirm('Confirmar o voto único da EJ nesta deliberação? Alterações exigem autorização da PRESCON.'))return;
  const entry={id:'a'+Date.now(),delib:x.id,ej:login.ej,name:String(fd.get('name')).trim(),email:String(fd.get('email')).trim(),votes,manif,institutionalVote:position,scenarioVotes:[],scenarioManif:[],scenarioAnswers,scenarioSnapshot:JSON.parse(JSON.stringify(sc)),formResponses:finalResponses,formSnapshot:JSON.parse(JSON.stringify(qs)),clarity:scales[0]||'',difficulty:scales[1]||'',improve:qs.flatMap((q,i)=>q.type==='textarea'?[finalResponses[i]]:[]).at(-1)||'',submittedAt:new Date().toISOString()};
- db.answers.push(entry);
- try{save()}catch(e){db.answers.pop();return alert('Não foi possível salvar. Tente novamente sem reenviar se houver dúvida.')}
- state.flash='Deliberação completa registrada neste navegador de demonstração.';render();
+ const previous=prior?JSON.parse(JSON.stringify(prior)):null;
+ const previousRequest=permission?JSON.parse(JSON.stringify(permission)):null;
+ if(prior){
+  db.voteHistory??=[];
+  db.voteHistory.push({delib:x.id,ej:login.ej,previous,changedAt:new Date().toISOString(),requestId:permission.id});
+  Object.assign(prior,entry,{id:prior.id,revision:(prior.revision||0)+1});
+  permission.status='used';permission.usedAt=new Date().toISOString();
+ }else db.answers.push(entry);
+ try{save()}catch(e){if(prior){Object.keys(prior).forEach(k=>delete prior[k]);Object.assign(prior,previous);Object.keys(permission).forEach(k=>delete permission[k]);Object.assign(permission,previousRequest);db.voteHistory.pop()}else db.answers.pop();return alert('Não foi possível salvar. Tente novamente sem reenviar se houver dúvida.')}
+ state.flash=prior?'Voto substituído com autorização; histórico preservado neste navegador.':'Voto institucional registrado neste navegador de demonstração.';render();
 };
 const oldRender=render;
 render=function(){
