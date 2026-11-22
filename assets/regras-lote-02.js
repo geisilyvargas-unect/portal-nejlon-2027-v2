@@ -3,7 +3,7 @@
 'use strict';
 const esc2=x=>esc(String(x??''));
 const voteOptions=['Aprova','Aprova com sugestões','Aprova com ressalvas','Reprova','Abstenho'];
-const oldVoteNames=['Abstem'];
+VOTES.splice(0,VOTES.length,...voteOptions);
 const isAdmin=()=>login?.role==='prescon';
 const draft=()=>{const x=d();return isAdmin()&&!x.published&&!x.closed};
 const getScenarios=x=>Array.isArray(x.scenarios)?x.scenarios:[];
