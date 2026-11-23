@@ -1,50 +1,50 @@
-/* Visualizador XLSX restaurado da lógica V1: abas, grade, download original. */
+/* Visualizador de PF recuperado do commit V1 3e1949b.
+   Todas as abas e células em grade, original preservado para download.
+   A prévia HTML não substitui o Excel para estilos, gráficos e fórmulas. */
 (function(){
 'use strict';
-const escape=x=>esc(String(x??''));
-const storageKey=id=>'nejlon-pf-original-'+id;
-function safeSheetHtml(sheet){
- const html=XLSX.utils.sheet_to_html(sheet,{header:'',footer:'',id:'nejlon-pf-visual'});
- const doc=new DOMParser().parseFromString(html,'text/html');
- doc.querySelectorAll('script,iframe,object,embed,form,style,link,svg').forEach(e=>e.remove());
- doc.querySelectorAll('*').forEach(e=>{for(const a of [...e.attributes])if(/^on/i.test(a.name)||['href','src','srcdoc','style'].includes(a.name))e.removeAttribute(a.name)});
- return doc.body.innerHTML;
+const escText=x=>esc(String(x??''));
+const key=id=>'nejlon-pf-original-'+id;
+const letter=n=>{let s='';for(n++;n;n=Math.floor((n-1)/26))s=String.fromCharCode(65+(n-1)%26)+s;return s};
+function renderGrid(rows){
+ const width=Math.max(1,...rows.map(r=>r.length));
+ const cols=Array.from({length:width},(_,i)=>'<th scope="col">'+letter(i)+'</th>').join('');
+ const body=rows.map((r,i)=>'<tr><th scope="row">'+(i+1)+'</th>'+Array.from({length:width},(_,j)=>'<td>'+escText(r[j]??'')+'</td>').join('')+'</tr>').join('');
+ return '<table class="pf-v1-grid"><thead><tr><th aria-label="Linha e coluna"></th>'+cols+'</tr></thead><tbody>'+body+'</tbody></table>';
 }
-function grid(rows){
- const max=Math.min(100,Math.max(1,...rows.map(r=>r.length)));
- const col=n=>{let s='';for(n++;n;n=Math.floor((n-1)/26))s=String.fromCharCode(65+(n-1)%26)+s;return s};
- return '<table class="l3sheet"><thead><tr><th></th>'+Array.from({length:max},(_,i)=>'<th>'+col(i)+'</th>').join('')+'</tr></thead><tbody>'+rows.map((r,i)=>'<tr><th>'+(i+1)+'</th>'+Array.from({length:max},(_,j)=>'<td>'+escape(r[j]??'')+'</td>').join('')+'</tr>').join('')+'</tbody></table>';
+async function readOriginal(x){
+ const pf=getPF(x),saved=localStorage.getItem(key(x.id));
+ if(pf?.blob)return XLSX.read(pf.blob,{type:'array',cellDates:true,cellFormula:true});
+ if(saved){
+  const base64=saved.split(',')[1];if(!base64)throw Error('Arquivo armazenado inválido.');
+  const raw=atob(base64),bytes=Uint8Array.from(raw,c=>c.charCodeAt(0));
+  return XLSX.read(bytes,{type:'array',cellDates:true,cellFormula:true});
+ }
+ if(pf?.sheets&&Object.keys(pf.sheets).length)return {SheetNames:Object.keys(pf.sheets),legacySheets:pf.sheets};
+ return null;
 }
-const previousOpen=v23OpenPF;
-v23OpenPF=function(){
+const originalOpen=v23OpenPF;
+v23OpenPF=async function(){
  const x=d(),host=document.getElementById('v23PFViewer');
- if(!host)return previousOpen();
- const stored=localStorage.getItem(storageKey(x.id)),pf=getPF(x);
- if(!stored&&!pf?.blob&&!pf?.sheets)return previousOpen();
- host.innerHTML='<div class="l3viewer"><div class="row"><strong>PLANILHA · '+escape(x.file||pf?.name||'XLSX')+'</strong><button class="btn outline" type="button" onclick="v23DownloadPF()">Baixar original</button></div><p class="tiny">Consulta somente leitura. A prévia não reproduz necessariamente gráficos, imagens, fontes ou todas as fórmulas; o XLSX original é a referência.</p><div class="l3tabs" role="tablist"></div><div class="l3scroll" tabindex="0" role="region" aria-label="Planilha financeira"></div><p class="tiny l3status" role="status"></p></div>';
- const tabs=host.querySelector('.l3tabs'),view=host.querySelector('.l3scroll'),status=host.querySelector('.l3status');
+ if(!host)return originalOpen();
+ if(typeof XLSX==='undefined')return host.textContent='A biblioteca de planilhas não carregou. Recarregue a página para tentar novamente.';
+ host.innerHTML='<div class="pf-v1-viewer"><div class="row"><strong>VISUALIZAÇÃO DA PLANILHA ORIGINAL · '+escText(x.file||'PF')+'</strong><button class="btn outline" type="button" onclick="v23DownloadPF()">BAIXAR XLSX ORIGINAL</button></div><p class="tiny">Abas, linhas e colunas para consulta. Valores exibidos são preservados quando presentes no XLSX; cores, gráficos, mesclagens e recálculo podem diferir do Excel.</p><div class="pf-v1-tabs" role="tablist" aria-label="Abas do PF"></div><div class="pf-v1-scroll" role="region" tabindex="0" aria-label="Grade da planilha"></div><p class="tiny pf-v1-status" role="status">Carregando planilha…</p></div>';
+ const tabs=host.querySelector('.pf-v1-tabs'),view=host.querySelector('.pf-v1-scroll'),status=host.querySelector('.pf-v1-status');
  try{
-  let workbook=null;
-  if(typeof XLSX!=='undefined'&&(stored||pf?.blob)){
-   let bytes;
-   if(pf?.blob)bytes=pf.blob;
-   else{const base64=stored.split(',')[1];const bin=atob(base64);bytes=Uint8Array.from(bin,c=>c.charCodeAt(0));}
-   workbook=XLSX.read(bytes,{type:'array',cellStyles:true,cellDates:true,cellFormula:true});
-  }
-  const names=workbook?.SheetNames||Object.keys(pf?.sheets||{});
-  if(!names.length)throw Error('Não há abas disponíveis neste navegador.');
-  function show(i){
-   const name=names[i];
-   tabs.querySelectorAll('button').forEach((b,j)=>{b.classList.toggle('active',j===i);b.setAttribute('aria-selected',String(j===i))});
-   if(workbook)view.innerHTML=safeSheetHtml(workbook.Sheets[name]);
-   else view.innerHTML=grid(pf.sheets[name]||[]);
-   status.textContent='Aba '+(i+1)+' de '+names.length+': '+name+' · prévia somente leitura';
-  }
-  names.forEach((name,i)=>{const b=document.createElement('button');b.type='button';b.textContent=name;b.setAttribute('role','tab');b.onclick=()=>show(i);tabs.append(b)});
+  const workbook=await readOriginal(x);
+  if(!workbook?.SheetNames?.length)throw Error('O arquivo original não está disponível neste navegador. Reimporte o XLSX na PRESCON.');
+  const sheets=workbook.SheetNames.map(name=>({name,rows:workbook.legacySheets?workbook.legacySheets[name]:XLSX.utils.sheet_to_json(workbook.Sheets[name],{header:1,defval:'',raw:false,blankrows:true})}));
+  const show=i=>{
+   const sh=sheets[i];view.innerHTML=renderGrid(sh.rows);
+   tabs.querySelectorAll('button').forEach((b,j)=>{b.classList.toggle('active',i===j);b.setAttribute('aria-selected',String(i===j))});
+   const width=Math.max(1,...sh.rows.map(r=>r.length));
+   status.textContent=sh.name+' · '+sh.rows.length+' linhas · '+width+' colunas · somente leitura';
+  };
+  sheets.forEach((sh,i)=>{const button=document.createElement('button');button.type='button';button.textContent=sh.name;button.setAttribute('role','tab');button.setAttribute('aria-selected','false');button.addEventListener('click',()=>show(i));tabs.append(button)});
   show(0);
- }catch(e){status.textContent='Não foi possível abrir a planilha: '+e.message;}
+ }catch(error){status.textContent='Não foi possível visualizar: '+String(error.message||error)}
 };
 const style=document.createElement('style');
-style.textContent='.l3viewer{margin:16px 0;border:2px solid #171717;border-radius:12px;padding:16px;background:#fff;color:#111}.l3tabs{display:flex;overflow-x:auto;gap:6px;padding:10px 0}.l3tabs button{white-space:nowrap;padding:9px 12px;background:#151515;color:#fff;border:1px solid #555;border-radius:6px;cursor:pointer}.l3tabs button.active{background:#ef202a;color:white;border-color:#ef202a}.l3scroll{max-height:580px;overflow:auto;border:1px solid #bbb;background:#fff}.l3scroll table{border-collapse:collapse;width:max-content;min-width:100%;font-size:12px;color:#111}.l3scroll td,.l3scroll th{border:1px solid #ddd;padding:5px 8px;min-width:68px;white-space:pre-wrap;vertical-align:top}.l3scroll th{background:#eee;position:sticky;top:0;z-index:1}.l3scroll tr:nth-child(even){background:#fafafa}.l3status{margin-top:8px}';
- document.head.appendChild(style);
+style.textContent='.pf-v1-viewer{margin:16px 0;border:2px solid #111;background:#fff;color:#111;padding:16px}.pf-v1-tabs{display:flex;gap:6px;overflow-x:auto;padding:12px 0}.pf-v1-tabs button{white-space:nowrap;padding:10px 14px;background:#111;color:#fff;border:1px solid #111;cursor:pointer;font-weight:800}.pf-v1-tabs button.active{background:#f00;color:#fff}.pf-v1-scroll{max-height:620px;overflow:auto;border:1px solid #999;background:#fff}.pf-v1-grid{border-collapse:collapse;width:max-content;min-width:100%;font:12px Arial,sans-serif;color:#111}.pf-v1-grid td,.pf-v1-grid th{border:1px solid #ccc;padding:6px 8px;min-width:70px;white-space:pre-wrap;vertical-align:top}.pf-v1-grid th{background:#eee;position:sticky;top:0;z-index:1}.pf-v1-grid tbody th{position:sticky;left:0;z-index:1}.pf-v1-status{margin-top:10px}';
+document.head.appendChild(style);
 })();
